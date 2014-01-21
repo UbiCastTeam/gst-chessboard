@@ -25,6 +25,7 @@ Checking
     gst-inspect chessfind 
     
 Options
+
     gst-inspect chessfind:
       display : Sets whether the detected chessboard should be highlighted in
           the output flags: accès en lecture, accès en écriture Boolean. Default: true Current: true 
@@ -34,4 +35,5 @@ Options
           flags: accès en lecture, accès en écriture Integer. Range: 4 - 2147483647 Default: 6 Current: 6 
 
 Example pipelines
-    With a video : gst-launch -v -m filesrc location=video.ogg ! decodebin ! ffmpegcolorspace ! queue ! chessfind ! queue ! ffmpegcolorspace ! ximagesink 
+    With a video : 
+    gst-launch -v -m filesrc location=video.ogg ! decodebin ! ffmpegcolorspace ! queue ! chessfind ! queue ! ffmpegcolorspace ! ximagesink 
