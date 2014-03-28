@@ -290,6 +290,7 @@ gst_chessfind_chain (GstPad * pad, GstBuffer * buf)
 
   CvPoint2D32f *corners = (CvPoint2D32f*) malloc(sizeof(CvPoint2D32f)*(filter->rows-1)*(filter->columns-1));
   int corner_count;
+  cvAdaptiveThreshold(filter->grayImage, filter->grayImage, 255, CV_ADAPTIVE_THRESH_GAUSSIAN_C, CV_THRESH_BINARY, 151, 1);
   int found = cvFindChessboardCorners(filter->grayImage,
 				       cvSize( filter->rows-1 , filter->columns-1 ),
 				       corners,
