@@ -71,11 +71,10 @@ struct _Gstchessfind
 
   GstPad *sinkpad, *srcpad;
 
-  gboolean silent;
-  gboolean display;
+  gboolean silent, display;
   gint width, height;
   IplImage *currentImage, *grayImage;
-  gint rows, columns;
+  gint rows, columns, filtersize;
 
 };
 

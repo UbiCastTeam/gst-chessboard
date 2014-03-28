@@ -70,6 +70,7 @@ GST_DEBUG_CATEGORY_STATIC (gst_chessfind_debug);
 #define GST_CAT_DEFAULT gst_chessfind_debug
 #define DEFAULT_ROWS 4
 #define DEFAULT_COLUMNS 6
+#define DEFAULT_FILTERSIZE 71
 
 /* Filter signals and args */
 enum
@@ -81,10 +82,11 @@ enum
 enum
 {
   PROP_0,
-  PROP_DISPLAY,
   PROP_SILENT,
+  PROP_DISPLAY,
   PROP_ROWS,
-  PROP_COLUMNS
+  PROP_COLUMNS,
+  PROP_FILTERSIZE
 };
 
 /* the capabilities of the inputs and outputs.
@@ -123,8 +125,8 @@ gst_chessfind_base_init (gpointer gclass)
 
   gst_element_class_set_details_simple(element_class,
     "chessfind",
-    "OpenCV",
-    "Performs chessboard detection on videos and images, send message when found, draw chessboard corners",
+    "FIXME:Generic",
+    "FIXME:Generic Template Element",
     "lavi <<flavie.lancereau@ubicast.eu>>");
 
   gst_element_class_add_pad_template (element_class,
@@ -151,11 +153,8 @@ gst_chessfind_class_init (GstchessfindClass * klass)
 							 FALSE, G_PARAM_READWRITE));
 
   g_object_class_install_property (gobject_class, PROP_DISPLAY,
-				   g_param_spec_boolean ("display", "Display",
-							 "Sets whether the detected chessboard should be highlighted in the output",
-							 TRUE,
-							 G_PARAM_READWRITE));
-
+				   g_param_spec_boolean ("display", "Display", "Display chessboard and filter",
+							 FALSE, G_PARAM_READWRITE));
 
   g_object_class_install_property (gobject_class, PROP_ROWS,
 				   g_param_spec_int ("rows", "Number of rows",
@@ -167,6 +166,12 @@ gst_chessfind_class_init (GstchessfindClass * klass)
 				   g_param_spec_int ("columns", "Number of columns",
 						     "Number of chessboard's columns",
 						     4, G_MAXINT, DEFAULT_COLUMNS,
+						     G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_FILTERSIZE,
+				   g_param_spec_int ("filtersize", "Size of filter",
+						     "Size of the adaptive threshold filter",
+						     3, G_MAXINT, DEFAULT_FILTERSIZE,
 						     G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
 }
@@ -195,9 +200,10 @@ gst_chessfind_init (Gstchessfind * filter,
   gst_element_add_pad (GST_ELEMENT (filter), filter->sinkpad);
   gst_element_add_pad (GST_ELEMENT (filter), filter->srcpad);
   filter->silent = FALSE;
-  filter->display = TRUE;
+  filter->display = FALSE;
   filter->rows = DEFAULT_ROWS;
   filter->columns = DEFAULT_COLUMNS;
+  filter->filtersize = DEFAULT_FILTERSIZE;
 }
 
 static void
@@ -219,6 +225,9 @@ gst_chessfind_set_property (GObject * object, guint prop_id,
     case PROP_COLUMNS:
       filter->columns = g_value_get_int (value);
       break;
+    case PROP_FILTERSIZE:
+      filter->filtersize = g_value_get_int (value);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -236,13 +245,16 @@ gst_chessfind_get_property (GObject * object, guint prop_id,
       g_value_set_boolean (value, filter->silent);
       break;
     case PROP_DISPLAY:
-      g_value_set_boolean (value, filter->display);
+      g_value_set_boolean (value, filter->silent);
       break;
     case PROP_ROWS:
       g_value_set_int (value, filter->rows);
       break;
     case PROP_COLUMNS:
       g_value_set_int (value, filter->columns);
+      break;
+    case PROP_FILTERSIZE:
+      g_value_set_int (value, filter->filtersize);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -289,9 +301,11 @@ gst_chessfind_chain (GstPad * pad, GstBuffer * buf)
   cvCvtColor(filter->currentImage, filter->grayImage, CV_RGB2GRAY);
 
   CvPoint2D32f *corners = (CvPoint2D32f*) malloc(sizeof(CvPoint2D32f)*(filter->rows-1)*(filter->columns-1));
-  int corner_count;
-  cvAdaptiveThreshold(filter->grayImage, filter->grayImage, 255, CV_ADAPTIVE_THRESH_GAUSSIAN_C, CV_THRESH_BINARY, 151, 1);
-  int found = cvFindChessboardCorners(filter->grayImage,
+  if(filter->filtersize % 2 == 0)
+    filter->filtersize = filter->filtersize + 1;
+  cvAdaptiveThreshold(filter->grayImage, filter->grayImage, 255, CV_ADAPTIVE_THRESH_GAUSSIAN_C, CV_THRESH_BINARY, filter->filtersize, 1);
+  gint corner_count;
+  gint found = cvFindChessboardCorners(filter->grayImage,
 				       cvSize( filter->rows-1 , filter->columns-1 ),
 				       corners,
 				       &corner_count,
@@ -306,14 +320,18 @@ gst_chessfind_chain (GstPad * pad, GstBuffer * buf)
       GstMessage *m = gst_message_new_element (GST_OBJECT (filter), s);
       gst_element_post_message (GST_ELEMENT (filter), m);
 
-      if (filter->display)
-	cvDrawChessboardCorners(filter->currentImage,
-				cvSize( filter->rows-1 , filter->columns-1 ),
-				corners,
-				corner_count,
-				found );
     }
   free(corners);
+
+  if (filter->display)
+    {
+    cvCvtColor(filter->grayImage, filter->currentImage, CV_GRAY2RGB);
+	cvDrawChessboardCorners(filter->currentImage,
+			cvSize( filter->rows-1 , filter->columns-1 ),
+			corners,
+			corner_count,
+			found );
+    }
   /* just push out the incoming buffer without touching it */
   return gst_pad_push (filter->srcpad, buf);
 }
